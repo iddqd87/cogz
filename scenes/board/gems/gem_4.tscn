@@ -1,0 +1,10 @@
+[gd_scene load_steps=3 format=3 uid="uid://bdryikl2j4ay8"]
+
+[ext_resource type="PackedScene" uid="uid://d3fqf2acl63iy" path="res://scenes/board/gems/gem_base.tscn" id="1_base"]
+[ext_resource type="Texture2D" uid="uid://c36yn6uo4sghx" path="res://assets/sprites/gems/gem_pink.png" id="2_texture"]
+
+[node name="Gem4" instance=ExtResource("1_base")]
+
+[node name="Sprite2D" parent="." index="0"]
+texture = ExtResource("2_texture")
+centered = false
