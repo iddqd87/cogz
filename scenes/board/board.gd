@@ -13,11 +13,11 @@ var operations: Node
 
 const PieceTypes = preload("res://scenes/board/piece_types.gd")
 
-# Use a dynamic list of allowed piece type names based on the toggle
+# Use all types except 'debug' by default
 var ALLOWED_PIECE_TYPES = []
 
-# Toggle to include or exclude the debug piece (gem_0)
-var INCLUDE_DEBUG_PIECE := false  # Set to true to include the debug piece
+# Toggle to include or exclude debug pieces
+var INCLUDE_DEBUG_PIECE := false  # Set to true to include debug pieces
 
 # Set the required number of connecting colors for a match
 var MATCH_LENGTH := 4  # Change this to set how many connecting colors are required
@@ -25,7 +25,12 @@ var MATCH_LENGTH := 4  # Change this to set how many connecting colors are requi
 @onready var piece_container = $PieceContainer
 
 func _ready():
-    ALLOWED_PIECE_TYPES = ["debug", "green", "blue", "yellow", "purple", "red"] if INCLUDE_DEBUG_PIECE else ["green", "blue", "yellow", "purple", "red"]
+    ALLOWED_PIECE_TYPES = []
+    for type_name in PieceTypes.PIECE_TYPES.keys():
+        var type_data = PieceTypes.PIECE_TYPES[type_name]
+        if type_data.has("scene") and type_data["scene"] != "" and ResourceLoader.exists(type_data["scene"]):
+            if type_name != "debug":
+                ALLOWED_PIECE_TYPES.append(type_name)
     var board_pixel_size = Vector2(GRID_SIZE_X * PIECE_SIZE, GRID_SIZE_Y * PIECE_SIZE)
     var win_size = get_viewport_rect().size
     piece_container.position = (win_size - board_pixel_size) / 2
@@ -51,11 +56,11 @@ func _ready():
 func preload_piece_scenes():
     piece_scenes.clear()
     for type_name in ALLOWED_PIECE_TYPES:
-        var path = PieceTypes.GEM_TYPE_SCENES.get(type_name, "")
-        if path != "" and ResourceLoader.exists(path):
-            piece_scenes[type_name] = load(path)
+        var type_data = PieceTypes.PIECE_TYPES.get(type_name, null)
+        if type_data and type_data.has("scene") and ResourceLoader.exists(type_data["scene"]):
+            piece_scenes[type_name] = load(type_data["scene"])
         else:
-            push_error("Missing piece scene: %s" % path)
+            push_error("Missing piece scene: %s" % (type_data["scene"] if type_data else type_name))
             piece_scenes[type_name] = null
 
 func initialize_grid():

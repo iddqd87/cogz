@@ -43,7 +43,10 @@ func enter_state(new_state: BoardState):
 func handle_input(event: InputEvent) -> void:
     # Handle mouse/touch release in any state
     if (event is InputEventMouseButton or event is InputEventScreenTouch) and not event.pressed:
-        enter_state(BoardState.IDLE)
+        if current_state == BoardState.SHIFTING_ROW or current_state == BoardState.SHIFTING_COLUMN:
+            enter_state(BoardState.MATCH_CHECK)
+        else:
+            enter_state(BoardState.IDLE)
         return
 
     match current_state:
@@ -96,15 +99,13 @@ func handle_drag(event: InputEvent) -> void:
         if abs(cell_shift) != 0 and cell_shift != drag_last_shift:
             board.operations.shift_row(drag_index, sign(cell_shift - drag_last_shift))
             drag_last_shift = cell_shift
-            # After a shift, check for matches
-            enter_state(BoardState.MATCH_CHECK)
+            # Do NOT call MATCH_CHECK here; wait for drag release
     elif current_state == BoardState.SHIFTING_COLUMN and drag_index >= 0:
         var cell_shift = int((event.position.y - drag_start_pos.y) / board.PIECE_SIZE)
         if abs(cell_shift) != 0 and cell_shift != drag_last_shift:
             board.operations.shift_column(drag_index, sign(cell_shift - drag_last_shift))
             drag_last_shift = cell_shift
-            # After a shift, check for matches
-            enter_state(BoardState.MATCH_CHECK)
+            # Do NOT call MATCH_CHECK here; wait for drag release
 
 func set_match_length(length: int):
     match_length = length
@@ -132,7 +133,8 @@ func find_all_matches() -> Array:
         var run_length = 0
         for x in range(board.GRID_SIZE_X):
             var piece_type = board.grid[x][y]
-            if PieceTypes.MATCHABLE_TYPES.get(piece_type, false):
+            var type_data = PieceTypes.PIECE_TYPES.get(piece_type, null)
+            if type_data and type_data.get("matchable", false):
                 if piece_type == run_type:
                     run_length += 1
                 else:
@@ -158,7 +160,8 @@ func find_all_matches() -> Array:
         var run_length = 0
         for y in range(board.GRID_SIZE_Y):
             var piece_type = board.grid[x][y]
-            if PieceTypes.MATCHABLE_TYPES.get(piece_type, false):
+            var type_data = PieceTypes.PIECE_TYPES.get(piece_type, null)
+            if type_data and type_data.get("matchable", false):
                 if piece_type == run_type:
                     run_length += 1
                 else:

@@ -1,6 +1,6 @@
 [gd_scene load_steps=3 format=3 uid="uid://dbgtm4yn8qwdk"]
 
-[ext_resource type="PackedScene" uid="uid://d3fqf2acl63iy" path="res://scenes/board/gems/gem_base.tscn" id="1_base"]
+[ext_resource type="PackedScene" uid="uid://dosjwey27rcke" path="res://scenes/board/pieces/piece_base.tscn" id="1_base"]
 [ext_resource type="Texture2D" uid="uid://d3oetixettbpq" path="res://assets/sprites/gems/gem_green.png" id="2_texture"]
 
 [node name="Gem1" instance=ExtResource("1_base")]

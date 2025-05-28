@@ -1,22 +1,42 @@
-# Gem type configuration for board
-# Add new types and their properties here
+# Centralized piece type configuration
+# Scene-to-Color Mapping:
+# - gem_0.tscn is DEBUG (test piece)
+# - gem_1.tscn is GREEN
+# - gem_2.tscn is BLUE
+# - gem_3.tscn is YELLOW
+# - gem_4.tscn is RED
+# - gem_5.tscn is PINK
+# - gear_0.tscn is DEBUG GEAR (future use)
+# - gear_1.tscn is GREEN GEAR (future use)
+# - (add more here)
 
-const MATCHABLE_TYPES = {
-    "red": true,
-    "green": true,
-    "blue": true,
-    "yellow": true,
-    "purple": true,
-    "debug": true, # for gem_0
-    "gear": false # example future type
-}
-
-const GEM_TYPE_SCENES = {
-    "debug": "res://scenes/board/pieces/gem_0.tscn",
-    "green": "res://scenes/board/pieces/gem_1.tscn",
-    "blue": "res://scenes/board/pieces/gem_2.tscn",
-    "yellow": "res://scenes/board/pieces/gem_3.tscn",
-    "purple": "res://scenes/board/pieces/gem_4.tscn",
-    "red": "res://scenes/board/pieces/gem_5.tscn",
-    "gear": "res://scenes/board/pieces/gem_gear.tscn" # placeholder for future
+const PIECE_TYPES = {
+    "debug": {
+        "scene": "res://scenes/board/pieces/gem_0.tscn",
+        "matchable": true
+    },
+    "green": {
+        "scene": "res://scenes/board/pieces/gem_1.tscn",
+        "matchable": true
+    },
+    "blue": {
+        "scene": "res://scenes/board/pieces/gem_2.tscn",
+        "matchable": true
+    },
+    "yellow": {
+        "scene": "res://scenes/board/pieces/gem_3.tscn",
+        "matchable": true
+    },
+    "red": {
+        "scene": "res://scenes/board/pieces/gem_4.tscn",
+        "matchable": true
+    },
+    "pink": {
+        "scene": "res://scenes/board/pieces/gem_5.tscn",
+        "matchable": true
+    },
+    "gear": {
+        "scene": "res://scenes/board/pieces/gem_gear.tscn",
+        "matchable": false
+    }
 } 
