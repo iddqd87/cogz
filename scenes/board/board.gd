@@ -2,33 +2,39 @@ extends Control
 
 const GRID_SIZE_X = 8
 const GRID_SIZE_Y = 8
-const GEM_SIZE = 16
-const GEM_TYPES = 6
+const PIECE_SIZE = 16
+const PIECE_TYPES = 6
 
 var grid := []
-var gem_nodes := []
-var gem_scenes := {}
+var piece_nodes := []
+var piece_scenes := {}
 var state_machine: Node
 var operations: Node
 
-# Toggle to include or exclude the debug gem (gem_0)
-var INCLUDE_DEBUG_GEM := false  # Set to true to include the debug gem
+const PieceTypes = preload("res://scenes/board/piece_types.gd")
 
-# Use a dynamic list of allowed gem indices based on the toggle
-var ALLOWED_GEM_INDICES = []
+# Use a dynamic list of allowed piece type names based on the toggle
+var ALLOWED_PIECE_TYPES = []
 
-@onready var gem_container = $GemContainer
+# Toggle to include or exclude the debug piece (gem_0)
+var INCLUDE_DEBUG_PIECE := false  # Set to true to include the debug piece
+
+# Set the required number of connecting colors for a match
+var MATCH_LENGTH := 4  # Change this to set how many connecting colors are required
+
+@onready var piece_container = $PieceContainer
 
 func _ready():
-    ALLOWED_GEM_INDICES = range(0, 6) if INCLUDE_DEBUG_GEM else range(1, 6)
-    var board_pixel_size = Vector2(GRID_SIZE_X * GEM_SIZE, GRID_SIZE_Y * GEM_SIZE)
+    ALLOWED_PIECE_TYPES = ["debug", "green", "blue", "yellow", "purple", "red"] if INCLUDE_DEBUG_PIECE else ["green", "blue", "yellow", "purple", "red"]
+    var board_pixel_size = Vector2(GRID_SIZE_X * PIECE_SIZE, GRID_SIZE_Y * PIECE_SIZE)
     var win_size = get_viewport_rect().size
-    gem_container.position = (win_size - board_pixel_size) / 2
-    gem_container.size = board_pixel_size
+    piece_container.position = (win_size - board_pixel_size) / 2
+    piece_container.size = board_pixel_size
     
     # Initialize state machine
     var state_machine_script = load("res://scenes/board/board_state_machine.gd")
     state_machine = state_machine_script.new(self)
+    state_machine.set_match_length(MATCH_LENGTH) # Set match length on state machine
     add_child(state_machine)
     
     # Initialize operations
@@ -36,56 +42,79 @@ func _ready():
     operations = operations_script.new(self)
     add_child(operations)
     
-    preload_gem_scenes()
+    preload_piece_scenes()
     initialize_grid()
-    spawn_visual_gems()
+    spawn_visual_pieces()
+    # Clear any initial matches (optionally, could avoid matches during population for efficiency)
+    state_machine.clear_initial_matches()
 
-func preload_gem_scenes():
-    gem_scenes.clear()
-    for i in ALLOWED_GEM_INDICES:
-        var path = "res://scenes/board/gems/gem_%d.tscn" % i
-        if ResourceLoader.exists(path):
-            gem_scenes[i] = load(path)
+func preload_piece_scenes():
+    piece_scenes.clear()
+    for type_name in ALLOWED_PIECE_TYPES:
+        var path = PieceTypes.GEM_TYPE_SCENES.get(type_name, "")
+        if path != "" and ResourceLoader.exists(path):
+            piece_scenes[type_name] = load(path)
         else:
-            push_error("Missing gem scene: %s" % path)
-            gem_scenes[i] = null
+            push_error("Missing piece scene: %s" % path)
+            piece_scenes[type_name] = null
 
 func initialize_grid():
     grid = []
     for x in range(GRID_SIZE_X):
         grid.append([])
         for y in range(GRID_SIZE_Y):
-            # Only use allowed gem indices
-            var allowed = ALLOWED_GEM_INDICES
-            grid[x].append(allowed[randi() % allowed.size()])
+            var allowed = ALLOWED_PIECE_TYPES
+            var possible = allowed.duplicate()
+            # Remove types that would cause a match horizontally
+            if x >= MATCH_LENGTH - 1:
+                var is_match = true
+                for i in range(1, MATCH_LENGTH):
+                    if grid[x - i][y] != grid[x - 1][y]:
+                        is_match = false
+                        break
+                if is_match:
+                    possible.erase(grid[x - 1][y])
+            # Remove types that would cause a match vertically
+            if y >= MATCH_LENGTH - 1:
+                var is_match = true
+                for i in range(1, MATCH_LENGTH):
+                    if grid[x][y - i] != grid[x][y - 1]:
+                        is_match = false
+                        break
+                if is_match:
+                    possible.erase(grid[x][y - 1])
+            # Pick randomly from possible types
+            if possible.size() == 0:
+                possible = allowed # fallback, should be rare
+            grid[x].append(possible[randi() % possible.size()])
 
-func spawn_visual_gems():
-    for child in gem_container.get_children():
+func spawn_visual_pieces():
+    for child in piece_container.get_children():
         child.queue_free()
-    gem_nodes = []
+    piece_nodes = []
     for x in range(GRID_SIZE_X):
-        gem_nodes.append([])
+        piece_nodes.append([])
         for y in range(GRID_SIZE_Y):
-            var gem_type = grid[x][y]
-            var gem_scene = gem_scenes.get(gem_type, null)
-            if gem_scene:
-                var gem = gem_scene.instantiate()
-                gem.position = Vector2(x, y) * GEM_SIZE
-                gem_container.add_child(gem)
-                gem_nodes[x].append(gem)
+            var piece_type = grid[x][y]
+            var piece_scene = piece_scenes.get(piece_type, null)
+            if piece_scene:
+                var piece = piece_scene.instantiate()
+                piece.position = Vector2(x, y) * PIECE_SIZE
+                piece_container.add_child(piece)
+                piece_nodes[x].append(piece)
             else:
-                push_error("No gem scene for type %d at (%d, %d)" % [gem_type, x, y])
-                gem_nodes[x].append(null)
+                push_error("No piece scene for type %s at (%d, %d)" % [piece_type, x, y])
+                piece_nodes[x].append(null)
 
 func update_visual_positions():
     for x in range(GRID_SIZE_X):
         for y in range(GRID_SIZE_Y):
-            if x < gem_nodes.size() and y < gem_nodes[x].size():
-                var gem = gem_nodes[x][y]
-                if gem:
-                    gem.position = Vector2(x, y) * GEM_SIZE
+            if x < piece_nodes.size() and y < piece_nodes[x].size():
+                var piece = piece_nodes[x][y]
+                if piece:
+                    piece.position = Vector2(x, y) * PIECE_SIZE
                 else:
-                    push_error("Null gem at (%d, %d)" % [x, y])
+                    push_error("Null piece at (%d, %d)" % [x, y])
             else:
                 push_error("Invalid grid index (%d, %d)" % [x, y])
 

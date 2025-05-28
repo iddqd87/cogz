@@ -10,7 +10,7 @@ anchors_preset = 0
 theme = ExtResource("2_ixnqm")
 script = ExtResource("1_s78fa")
 
-[node name="GemContainer" type="Control" parent="."]
+[node name="PieceContainer" type="Control" parent="."]
 layout_mode = 1
 anchors_preset = 8
 anchor_left = 0.5

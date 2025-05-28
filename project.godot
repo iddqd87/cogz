@@ -10,8 +10,8 @@ config_version=5
 
 [application]
 
-config/name="godot-game-template"
-config/version="0.0.1"
+config/name="Cogz"
+config/version="Alpha 0.1"
 run/main_scene="res://scenes/menu/menu.tscn"
 config/features=PackedStringArray("4.4")
 boot_splash/bg_color=Color(0.0862745, 0.0862745, 0.0862745, 1)
