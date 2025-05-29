@@ -1,11 +1,17 @@
 extends Node
 
+# --- Member Variables ---
 var board: Node
 
+# --- Built-in Functions ---
 func _init(board_node: Node):
     board = board_node
 
+# --- Board Operation Methods ---
 func shift_row(y: int, direction: int):
+    if not board:
+        push_error("Board is null in shift_row!")
+        return
     if y < 0 or y >= board.GRID_SIZE_Y:
         push_error("Invalid row index %d" % y)
         return
@@ -31,6 +37,9 @@ func shift_row(y: int, direction: int):
     board.update_visual_positions()
 
 func shift_column(x: int, direction: int):
+    if not board:
+        push_error("Board is null in shift_column!")
+        return
     if x < 0 or x >= board.GRID_SIZE_X:
         push_error("Invalid column index %d" % x)
         return

@@ -1,9 +1,14 @@
-[gd_scene load_steps=4 format=3 uid="uid://c2gocuhw2o7py"]
+[gd_scene load_steps=5 format=3 uid="uid://c2gocuhw2o7py"]
 
+[ext_resource type="FontFile" uid="uid://cawekr44fruhm" path="res://assets/fonts/open-sans/open-sans-regular.ttf" id="3_e0arn"]
 [ext_resource type="FontFile" uid="uid://da2t6lyf41wty" path="res://assets/fonts/open-sans/open-sans-bold.ttf" id="4"]
 [ext_resource type="Script" uid="uid://cvc42inud8fxx" path="res://scenes/menu/menu.gd" id="5"]
 
 [sub_resource type="LabelSettings" id="LabelSettings_mcvr8"]
+line_spacing = 0.0
+paragraph_spacing = -3.0
+font = ExtResource("3_e0arn")
+font_size = 5
 
 [node name="Menu" type="Control"]
 layout_mode = 3
@@ -57,29 +62,59 @@ theme_override_constants/separation = 16
 layout_mode = 2
 theme_override_fonts/font = ExtResource("4")
 theme_override_font_sizes/font_size = 60
-text = "
+text = "                                      
+                                      
+  ██████   ██████   ███████  █████████
+ ███░░███ ███░░███ ███░░███ ░█░░░░███ 
+░███ ░░░ ░███ ░███░███ ░███ ░   ███░  
+░███  ███░███ ░███░███ ░███   ███░   █
+░░██████ ░░██████ ░░███████  █████████
+ ░░░░░░   ░░░░░░   ░░░░░███ ░░░░░░░░░ 
+                   ███ ░███           
+                  ░░██████            
+                   ░░░░░░             
 
-Cogz + BALLZ
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
 "
 label_settings = SubResource("LabelSettings_mcvr8")
-horizontal_alignment = 1
+horizontal_alignment = 3
 vertical_alignment = 3
-uppercase = true
 
 [node name="PlayButton" type="Button" parent="MarginContainer/Control/VBoxContainer"]
 layout_mode = 2
 focus_neighbor_bottom = NodePath("../ExitButton")
 focus_next = NodePath("../ExitButton")
-text = "START"
+text = "[ START ]"
 
 [node name="ExitButton" type="Button" parent="MarginContainer/Control/VBoxContainer"]
 layout_mode = 2
 focus_neighbor_top = NodePath("../PlayButton")
 focus_previous = NodePath("../PlayButton")
-text = "EXIT"
+text = "[ EXIT ]"
 
 [connection signal="pressed" from="MarginContainer/Control/VBoxContainer/PlayButton" to="." method="_on_PlayButton_pressed"]
 [connection signal="pressed" from="MarginContainer/Control/VBoxContainer/ExitButton" to="." method="_on_ExitButton_pressed"]

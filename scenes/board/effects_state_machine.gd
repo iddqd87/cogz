@@ -1,39 +1,47 @@
 extends Node
 
+# --- Signals ---
+signal _line_raised(pieces)
+signal _line_lowered(pieces)
+signal _piece_fell(piece)
+
+# --- Constants ---
+# (Add any constants here if needed)
+
+# --- Member Variables ---
 var effects_enabled := true # Toggle to enable/disable all effects
 var debug_mode := false # Toggle debug output
 
-# TWEAK SETTINGS (Animation & Timing)
-
-# --- Raise/Pop Effect ---
+# --- Tweak Settings (Animation & Timing) ---
 var raise_offset := -20         # How high to raise the line (pixels, optional)
 var raise_duration := 0.15      # How long the raise animation takes (seconds)
 var raise_ease := Tween.TRANS_QUINT
 var raise_ease_type := Tween.EASE_OUT
-var raise_scale := 1.15         # How much to scale up when raising
+var raise_scale := 1.06         # How much to scale up when raising
 var raise_z_index := 10         # z_index when raised
 var normal_z_index := 0         # default z_index
 
-# --- Fall/Refill Effect ---
 var fall_speed_per_cell := 0.07 # Seconds per cell (lower = faster fall) Classic match-3 feel at 0.07
 var fall_exponent := 0.5 # Amount of momentum longer falls have. Classic: sqrt for momentum
 var min_fall_time := 0.04 # Minimum time for any fall, even for a single cell (prevents instant jumps) Classic: short but visible at .04
 var fall_ease := Tween.TRANS_BOUNCE # Easing function for the fall (BOUNCE = classic, playful)
 
-# State for tracking currently raised line
+# --- State for tracking currently raised line ---
 var _raised_pieces := []
 var _raised_positions := []
 var _raised_mode := ""
 var _raised_index := -1
 
-# --- Signals for future use (connect in the editor or code) ---
-signal _line_raised(pieces)
-signal _line_lowered(pieces)
-signal _piece_fell(piece)
+# --- Built-in Functions ---
+# (None needed for now)
 
+# --- Effect Methods ---
 # Animate raising a line of pieces (row or column) with raised effect
 func raise_line(board, mode: String, index: int):
     if not effects_enabled:
+        return
+    if not board:
+        push_error("Board is null in raise_line!")
         return
     _raised_pieces.clear()
     _raised_positions.clear()
@@ -41,16 +49,34 @@ func raise_line(board, mode: String, index: int):
     _raised_index = index
     if mode == "row":
         for x in range(board.GRID_SIZE_X):
+            if x >= board.piece_nodes.size() or index >= board.piece_nodes[x].size():
+                push_error("Invalid index in raise_line row: x=%d, index=%d" % [x, index])
+                continue
             var piece = board.piece_nodes[x][index]
+            if not piece:
+                push_error("Null piece in raise_line row at x=%d, index=%d" % [x, index])
+                continue
             _raised_pieces.append(piece)
             _raised_positions.append(piece.position)
     elif mode == "column":
         for y in range(board.GRID_SIZE_Y):
+            if index >= board.piece_nodes.size() or y >= board.piece_nodes[index].size():
+                push_error("Invalid index in raise_line column: index=%d, y=%d" % [index, y])
+                continue
             var piece = board.piece_nodes[index][y]
+            if not piece:
+                push_error("Null piece in raise_line column at index=%d, y=%d" % [index, y])
+                continue
             _raised_pieces.append(piece)
             _raised_positions.append(piece.position)
     for piece in _raised_pieces:
+        if not piece:
+            push_error("Null piece in _raised_pieces during tween in raise_line!")
+            continue
         var tween = piece.create_tween()
+        if not tween:
+            push_error("Failed to create tween for piece in raise_line!")
+            continue
         tween.tween_property(piece, "scale", Vector2(raise_scale, raise_scale), raise_duration).set_trans(raise_ease).set_ease(raise_ease_type)
         piece.z_index = raise_z_index
     if get_signal_connection_list("_line_raised").size() > 0:
@@ -62,6 +88,7 @@ func raise_line(board, mode: String, index: int):
 func lower_line(board, mode: String, index: int):
     if not effects_enabled:
         return
+    var _board = board # Silence unused parameter warning
     if _raised_mode != mode or _raised_index != index:
         return
     for i in range(_raised_pieces.size()):
@@ -80,6 +107,7 @@ func lower_line(board, mode: String, index: int):
 
 # Helper: Animate match removal (with delay, can be expanded for effects)
 func animate_match_removal(matches: Array, match_delay: float) -> void:
+    var _matches = matches # Silence unused parameter warning
     if not effects_enabled:
         await get_tree().create_timer(match_delay).timeout
         return
@@ -102,10 +130,10 @@ func animate_cascade(board) -> void:
                 if write_y != read_y:
                     var piece = board.piece_nodes[x][read_y]
                     var start_pos = piece.position
-                    var end_pos = Vector2(x, write_y) * piece_size
-                    var fall_distance = abs(write_y - read_y)
-                    var fall_time = min_fall_time + fall_speed_per_cell * pow(fall_distance, fall_exponent)
-                    fall_anims.append(await _fall_piece(piece, start_pos, end_pos, fall_time))
+                    var _end_pos = Vector2(x, write_y) * piece_size # Silence unused variable warning
+                    var _fall_distance = abs(write_y - read_y) # Silence unused variable warning
+                    var fall_time = min_fall_time + fall_speed_per_cell * pow(abs(write_y - read_y), fall_exponent)
+                    fall_anims.append(await _fall_piece(piece, start_pos, _end_pos, fall_time))
                     board.grid[x][write_y] = board.grid[x][read_y]
                     board.piece_nodes[x][write_y] = piece
                     board.grid[x][read_y] = null
@@ -118,14 +146,14 @@ func animate_cascade(board) -> void:
             var piece_scene = board.piece_scenes.get(new_type, null)
             if piece_scene:
                 var piece = piece_scene.instantiate()
-                var start_pos = Vector2(x, y - 1 - (grid_y - write_y)) * piece_size
+                var _start_pos = Vector2(x, y - 1 - (grid_y - write_y)) * piece_size # Silence unused variable warning
                 var end_pos = Vector2(x, y) * piece_size
-                var fall_distance = abs((y - 1 - (grid_y - write_y)) - y)
+                var _fall_distance = abs((y - 1 - (grid_y - write_y)) - y)
                 var fall_time = min_fall_time + fall_speed_per_cell * pow((grid_y - y), fall_exponent)
-                piece.position = start_pos
+                piece.position = _start_pos
                 board.piece_container.add_child(piece)
                 board.piece_nodes[x][y] = piece
-                fall_anims.append(await _fall_piece(piece, start_pos, end_pos, fall_time))
+                fall_anims.append(await _fall_piece(piece, _start_pos, end_pos, fall_time))
             else:
                 board.piece_nodes[x][y] = null
     for anim in fall_anims:
@@ -183,6 +211,7 @@ func animate_cascade_visuals(fall_moves, board):
     print("[Effects] Cascade visuals finished.")
     print("[Effects] REALLY returning from animate_cascade_visuals")
 
+# --- Debug/Utility Methods ---
 func set_debug_mode(enabled: bool):
     debug_mode = enabled
 

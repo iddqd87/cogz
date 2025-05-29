@@ -1,24 +1,28 @@
 extends Control
 
+# --- Constants ---
 const GRID_SIZE_X = 8
 const GRID_SIZE_Y = 8
 const PIECE_SIZE = 16
 const PIECE_TYPES = 6
 const PieceTypes = preload("res://scenes/board/piece_types.gd")
 
+# --- Member Variables ---
 var grid := []
 var piece_nodes := []
 var piece_scenes := {}
 var state_machine: Node
 var operations: Node
 
-#tweak settings
+# --- Tweak Settings ---
 var INCLUDE_DEBUG_PIECE := false  # Set to true to include debug pieces
 var MATCH_LENGTH := 3  # Set how many connections are required
 var ALLOWED_PIECE_TYPES = [] # Edit in piece_types.gd
 
+# --- Onready Variables ---
 @onready var piece_container = $PieceContainer
 
+# --- Built-in Functions ---
 func _ready():
     ALLOWED_PIECE_TYPES = []
     for type_name in PieceTypes.PIECE_TYPES.keys():
@@ -29,36 +33,47 @@ func _ready():
     var board_pixel_size = Vector2(GRID_SIZE_X * PIECE_SIZE, GRID_SIZE_Y * PIECE_SIZE)
     var win_size = get_viewport_rect().size
     piece_container.position = (win_size - board_pixel_size) / 2
-    piece_container.size = board_pixel_size
+    piece_container.set_deferred("size", board_pixel_size)
     
     # Initialize state machine
     var state_machine_script = load("res://scenes/board/board_state_machine.gd")
     state_machine = state_machine_script.new()
-    state_machine.set_board(self)
-    add_child(state_machine)
+    if not state_machine:
+        push_error("Failed to initialize state_machine!")
+    else:
+        state_machine.set_board(self)
+        add_child(state_machine)
     
     # Initialize operations
     var operations_script = load("res://scenes/board/board_operations.gd")
     operations = operations_script.new(self)
-    add_child(operations)
-    
-    # Ensure effects_state_machine node exists and has correct script
-    var effects_script = load("res://scenes/board/effects_state_machine.gd")
-    var effects_node = get_node_or_null("effects_state_machine")
-    if effects_node:
-        if not effects_node.has_method("raise_line"):
-            effects_node.set_script(effects_script)
+    if not operations:
+        push_error("Failed to initialize operations!")
     else:
-        effects_node = effects_script.new()
-        effects_node.name = "effects_state_machine"
-        add_child(effects_node)
+        add_child(operations)
+    
+    # Ensure effects_state_machine node has correct script
+    var effects_node = get_node_or_null("effects_state_machine")
+    if effects_node and not effects_node.has_method("raise_line"):
+        var effects_script = load("res://scenes/board/effects_state_machine.gd")
+        effects_node.set_script(effects_script)
     
     preload_piece_scenes()
     initialize_grid()
     spawn_visual_pieces()
     # Clear any initial matches (optionally, could avoid matches during population for efficiency)
-    state_machine.clear_initial_matches()
+    if state_machine:
+        state_machine.clear_initial_matches()
+    else:
+        push_error("State machine is null when calling clear_initial_matches!")
 
+func _input(event):
+    if state_machine:
+        state_machine.handle_input(event)
+    else:
+        push_error("State machine is null in board.gd _input!")
+
+# --- Custom Methods ---
 func preload_piece_scenes():
     piece_scenes.clear()
     for type_name in ALLOWED_PIECE_TYPES:
@@ -134,6 +149,3 @@ func shift_row(y: int, direction: int):
 
 func shift_column(x: int, direction: int):
     operations.shift_column(x, direction)
-
-func _input(event):
-    state_machine.handle_input(event)

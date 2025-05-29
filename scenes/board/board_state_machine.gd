@@ -1,5 +1,6 @@
 extends Node
 
+# --- Enums ---
 enum BoardState {
     IDLE,            # Waiting for player input
     DRAGGING,        # Player is dragging a row/column
@@ -10,11 +11,7 @@ enum BoardState {
     CASCADE_ANIMATE  # Animate falling tiles and refill (with delay)
 }
 
-# TWEAK SETTINGS
-var match_delay := 0.05 # seconds (simulate match disappear animation)
-# Add more tweakable settings here as needed
-
-# --- Signals for future use (connect in the editor or code) ---
+# --- Signals ---
 @warning_ignore("unused_signal")
 signal _line_raised(pieces)
 @warning_ignore("unused_signal")
@@ -22,7 +19,13 @@ signal _line_lowered(pieces)
 @warning_ignore("unused_signal")
 signal _piece_fell(piece)
 
-# Board state variables
+# --- Constants ---
+const PieceTypes = preload("res://scenes/board/piece_types.gd")
+
+# --- Tweak Settings ---
+var match_delay := 0.05 # seconds (simulate match disappear animation)
+
+# --- Member Variables ---
 var current_state: BoardState = BoardState.IDLE
 var board: Node
 var pending_matches := []
@@ -37,17 +40,19 @@ var drag_last_shift := 0 # Prevents multiple shifts per cell
 # Board lock state
 var input_locked := false
 
-const PieceTypes = preload("res://scenes/board/piece_types.gd")
-
 # --- EffectsStateMachine integration ---
 @onready var effects_state_machine = get_node_or_null("../effects_state_machine")
 var effects_enabled := true # Toggle to enable/disable all effects
 
 var debug_mode := false # Toggle debug output
 
+# --- Built-in Functions ---
 func set_board(board_node):
     board = board_node
 
+# --- State Machine Core ---
+# Handles all board state transitions and game logic.
+# Animations and effects are handled by effects_state_machine if enabled.
 func enter_state(new_state: BoardState):
     var previous_state = current_state
     current_state = new_state
@@ -94,14 +99,26 @@ func enter_state(new_state: BoardState):
         BoardState.SHIFTING_COLUMN:
             pass
         BoardState.MATCH_FIND:
-            await find_and_handle_matches()
+            if board:
+                await find_and_handle_matches()
+            else:
+                push_error("Board is null in enter_state MATCH_FIND!")
         BoardState.MATCH_ANIMATE:
-            await animate_and_remove_matches()
+            if board:
+                await animate_and_remove_matches()
+            else:
+                push_error("Board is null in enter_state MATCH_ANIMATE!")
         BoardState.CASCADE_ANIMATE:
-            await animate_and_refill_cascade()
+            if board:
+                await animate_and_refill_cascade()
+            else:
+                push_error("Board is null in enter_state CASCADE_ANIMATE!")
 
 func handle_input(event: InputEvent) -> void:
     if input_locked:
+        return
+    if not board:
+        push_error("Board is null in handle_input!")
         return
     # Handle mouse/touch release in any state
     if (event is InputEventMouseButton or event is InputEventScreenTouch) and not event.pressed:
@@ -134,7 +151,11 @@ func handle_input(event: InputEvent) -> void:
             if event is InputEventMouseMotion or event is InputEventScreenDrag:
                 handle_drag(event)
 
+# --- Drag Handling ---
 func handle_drag(event: InputEvent) -> void:
+    if not board:
+        push_error("Board is null in handle_drag!")
+        return
     var drag_delta = event.position - drag_start_pos
 
     if drag_mode == "":
@@ -169,13 +190,20 @@ func handle_drag(event: InputEvent) -> void:
             drag_last_shift = cell_shift
             # Do NOT call MATCH_FIND here; wait for drag release
 
-# Shift states are in board_operations.gd
+    if drag_mode == "row" and (drag_index < 0 or drag_index >= board.GRID_SIZE_Y):
+        push_error("Invalid drag_index for row: %d" % drag_index)
+        return
+    if drag_mode == "column" and (drag_index < 0 or drag_index >= board.GRID_SIZE_X):
+        push_error("Invalid drag_index for column: %d" % drag_index)
+        return
 
-# After a move, start the match-find cascade
+# --- Cascade and Match Handling ---
+# These functions handle the process of finding matches, animating their removal,
+# and refilling the board. If effects_enabled is false, all changes happen instantly
+# with no animation for fast gameplay or debugging.
 func start_cascade():
     await enter_state(BoardState.MATCH_FIND)
 
-# Find all matches and transition accordingly
 func find_and_handle_matches():
     var matches = find_all_matches()
     if matches.size() > 0:
@@ -187,8 +215,11 @@ func find_and_handle_matches():
         print("No matches found. Combo streak was: ", combo_count)
         await enter_state(BoardState.IDLE)
 
-# Animate and remove matches, then refill and animate cascade
 func animate_and_remove_matches():
+    """
+    Animate and remove matched pieces. If effects are enabled, use the effects_state_machine
+    to animate the removal. Otherwise, remove instantly.
+    """
     if effects_enabled:
         if effects_state_machine:
             await effects_state_machine.animate_match_removal(pending_matches, match_delay)
@@ -196,14 +227,18 @@ func animate_and_remove_matches():
             push_error("effects_state_machine is null in animate_match_removal!")
             await get_tree().create_timer(match_delay).timeout
     else:
+        # --- INSTANT MODE: No animation, just wait for match_delay (optional) ---
         await get_tree().create_timer(match_delay).timeout
     remove_matches(pending_matches) # Set matched cells to null, but don't move anything yet
     pending_matches = []
     await get_tree().create_timer(0.25).timeout # Pause before gravity
     await enter_state(BoardState.CASCADE_ANIMATE)
 
-# Animate falling tiles and refill, then check for new matches
 func animate_and_refill_cascade():
+    """
+    Animate falling tiles and refill, then check for new matches.
+    If effects_enabled is false, all changes are applied instantly with no animation.
+    """
     # 1. Calculate all fall moves and new spawns, and update board state
     var fall_moves = [] # Each move: {piece, from: Vector2, to: Vector2, is_new: bool}
     var grid_x = board.GRID_SIZE_X
@@ -230,7 +265,7 @@ func animate_and_refill_cascade():
                 var piece = piece_scene.instantiate()
                 var from_y = y - 1 - (grid_y - write_y)
                 var start_pos = Vector2(x, from_y) * piece_size
-                var end_pos = Vector2(x, y) * piece_size
+                var _end_pos = Vector2(x, y) * piece_size
                 piece.position = start_pos
                 board.piece_container.add_child(piece)
                 board.piece_nodes[x][y] = piece
@@ -238,10 +273,17 @@ func animate_and_refill_cascade():
             else:
                 board.piece_nodes[x][y] = null
     # 2. Animate visuals (or instantly finish if effects are disabled)
-    print("[Debug] About to animate cascade visuals")
-    if effects_state_machine:
+    if effects_enabled and effects_state_machine:
+        # --- ANIMATED MODE: Use effects_state_machine to animate cascade ---
+        print("[Debug] About to animate cascade visuals")
         effects_state_machine.animate_cascade_visuals(fall_moves, board)
-    print("[Debug] Finished animating cascade visuals")
+        print("[Debug] Finished animating cascade visuals")
+    else:
+        # --- INSTANT MODE: Instantly set all piece positions to their final spot ---
+        for move in fall_moves:
+            if move["piece"]:
+                move["piece"].position = move["to"] * board.PIECE_SIZE
+        print("[Effects] Cascade visuals skipped (effects disabled)")
     # 3. Print board state for debugging
     print_board_state()
     var matches = find_all_matches()
@@ -256,6 +298,8 @@ func animate_and_refill_cascade():
     else:
         await enter_state(BoardState.IDLE)
 
+# --- Debug and Utility Methods ---
+# Utility functions for debugging and board state printing.
 func print_board_state():
     print("[Debug] Board state:")
     for y in range(board.GRID_SIZE_Y):
@@ -268,10 +312,14 @@ func print_board_state():
 func check_for_matches():
     await start_cascade()
 
-# Find all horizontal and vertical matches for self-matching types
+# --- Match Finding and Removal ---
+# Finds all horizontal and vertical matches, removes them, and handles instant refill if effects are disabled.
 func find_all_matches() -> Array:
     var matches = []
     var visited = {}
+    if not board:
+        push_error("Board is null in find_all_matches!")
+        return matches
     # Horizontal
     for y in range(board.GRID_SIZE_Y):
         var run_type = null
@@ -351,12 +399,16 @@ func handle_no_match():
 
 # Call this after the initial board population to clear any starting matches
 func clear_initial_matches():
+    """
+    Removes any matches that exist on the initial board (to avoid free combos at game start).
+    If effects_enabled is false, all changes are applied instantly with no animation.
+    """
     while true:
         var matches = find_all_matches()
         if matches.size() == 0:
             break
         remove_matches(matches)
-        # Refill and update visuals instantly (no animation)
+        # --- INSTANT REFILL: No animation, just refill and update visuals instantly ---
         var fall_moves = []
         var grid_x = board.GRID_SIZE_X
         var grid_y = board.GRID_SIZE_Y
@@ -381,7 +433,7 @@ func clear_initial_matches():
                 if piece_scene:
                     var piece = piece_scene.instantiate()
                     var from_y = y - 1 - (grid_y - write_y)
-                    var start_pos = Vector2(x, from_y) * piece_size
+                    var _start_pos = Vector2(x, from_y) * piece_size
                     var end_pos = Vector2(x, y) * piece_size
                     piece.position = end_pos # Instantly set to final position
                     board.piece_container.add_child(piece)
@@ -391,7 +443,7 @@ func clear_initial_matches():
         # Instantly update visuals
         for move in fall_moves:
             if move["piece"]:
-                move["piece"].position = move["to"] * board.PIECE_SIZE 
+                move["piece"].position = move["to"] * board.PIECE_SIZE
 
 func set_debug_mode(enabled: bool):
     debug_mode = enabled

@@ -1,4 +1,5 @@
-# Centralized piece type configuration
+# --- Piece Types Configuration ---
+
 # Scene-to-Color Mapping:
 # - gem_0.tscn is DEBUG (test piece)
 # - gem_1.tscn is GREEN
@@ -8,8 +9,12 @@
 # - gem_5.tscn is PINK
 # - gear_0.tscn is DEBUG GEAR (future use)
 # - gear_1.tscn is GREEN GEAR (future use)
-# - (add more here)
+# - gear_2.tscn is BLUE GEAR (future use)
+# - gear_3.tscn is YELLOW GEAR (future use)
+# - gear_4.tscn is RED GEAR (future use)
+# - gear_5.tscn is PINK GEAR (future use)
 
+# --- Constants ---
 const PIECE_TYPES = {
     "debug": {
         "scene": "res://scenes/board/pieces/gem_0.tscn",
@@ -39,4 +44,6 @@ const PIECE_TYPES = {
         "scene": "res://scenes/board/pieces/gem_gear.tscn",
         "matchable": false
     }
-} 
+}
+
+# --- (Add helper functions here if needed) --- 
