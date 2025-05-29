@@ -1,7 +1,9 @@
-[gd_scene load_steps=3 format=3 uid="uid://c2gocuhw2o7py"]
+[gd_scene load_steps=4 format=3 uid="uid://c2gocuhw2o7py"]
 
 [ext_resource type="FontFile" uid="uid://da2t6lyf41wty" path="res://assets/fonts/open-sans/open-sans-bold.ttf" id="4"]
 [ext_resource type="Script" uid="uid://cvc42inud8fxx" path="res://scenes/menu/menu.gd" id="5"]
+
+[sub_resource type="LabelSettings" id="LabelSettings_mcvr8"]
 
 [node name="Menu" type="Control"]
 layout_mode = 3
@@ -36,25 +38,6 @@ grow_vertical = 2
 [node name="Control" type="Control" parent="MarginContainer"]
 layout_mode = 2
 
-[node name="CenterContainer" type="CenterContainer" parent="MarginContainer/Control"]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-offset_left = -31.0
-offset_top = -21.0
-offset_right = 32.0
-offset_bottom = -194.0
-grow_horizontal = 2
-grow_vertical = 2
-
-[node name="Title" type="Label" parent="MarginContainer/Control/CenterContainer"]
-layout_mode = 2
-theme_override_fonts/font = ExtResource("4")
-theme_override_font_sizes/font_size = 60
-text = "Cogs"
-uppercase = true
-
 [node name="VBoxContainer" type="VBoxContainer" parent="MarginContainer/Control"]
 layout_mode = 1
 anchors_preset = 8
@@ -63,12 +46,28 @@ anchor_top = 0.5
 anchor_right = 0.5
 anchor_bottom = 0.5
 offset_left = -80.5
-offset_top = -29.5
+offset_top = -148.5
 offset_right = 81.5
-offset_bottom = 134.5
+offset_bottom = 146.5
 grow_horizontal = 2
 grow_vertical = 2
 theme_override_constants/separation = 16
+
+[node name="Title" type="Label" parent="MarginContainer/Control/VBoxContainer"]
+layout_mode = 2
+theme_override_fonts/font = ExtResource("4")
+theme_override_font_sizes/font_size = 60
+text = "
+
+Cogz + BALLZ
+
+
+
+"
+label_settings = SubResource("LabelSettings_mcvr8")
+horizontal_alignment = 1
+vertical_alignment = 3
+uppercase = true
 
 [node name="PlayButton" type="Button" parent="MarginContainer/Control/VBoxContainer"]
 layout_mode = 2

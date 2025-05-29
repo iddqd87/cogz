@@ -15,8 +15,11 @@ var match_delay := 0.05 # seconds (simulate match disappear animation)
 # Add more tweakable settings here as needed
 
 # --- Signals for future use (connect in the editor or code) ---
+@warning_ignore("unused_signal")
 signal _line_raised(pieces)
+@warning_ignore("unused_signal")
 signal _line_lowered(pieces)
+@warning_ignore("unused_signal")
 signal _piece_fell(piece)
 
 # Board state variables
@@ -40,6 +43,8 @@ const PieceTypes = preload("res://scenes/board/piece_types.gd")
 @onready var effects_state_machine = get_node_or_null("../effects_state_machine")
 var effects_enabled := true # Toggle to enable/disable all effects
 
+var debug_mode := false # Toggle debug output
+
 func set_board(board_node):
     board = board_node
 
@@ -51,6 +56,8 @@ func enter_state(new_state: BoardState):
         input_locked = true
     else:
         input_locked = false
+    if debug_mode:
+        print("[State] Transition from ", previous_state, " to ", current_state, ", input_locked=", input_locked)
     # --- Lower raised line on any transition out of drag states ---
     if (previous_state == BoardState.SHIFTING_ROW or previous_state == BoardState.SHIFTING_COLUMN) and current_state != previous_state:
         if effects_enabled:
@@ -192,76 +199,70 @@ func animate_and_remove_matches():
         await get_tree().create_timer(match_delay).timeout
     remove_matches(pending_matches) # Set matched cells to null, but don't move anything yet
     pending_matches = []
-    await get_tree().create_timer(0.25).timeout # Pause with holes before gravity
+    await get_tree().create_timer(0.25).timeout # Pause before gravity
     await enter_state(BoardState.CASCADE_ANIMATE)
 
 # Animate falling tiles and refill, then check for new matches
 func animate_and_refill_cascade():
-    if effects_enabled:
-        if effects_state_machine:
-            await effects_state_machine.animate_cascade(board)
-        else:
-            push_error("effects_state_machine is null in animate_cascade!")
-            await queue_cascade_with_delay()
-    else:
-        await queue_cascade_with_delay()
-    await enter_state(BoardState.MATCH_FIND)
-
-# Cascade logic with delay (simulate fall animation)
-func queue_cascade_with_delay():
-    # For each column, move pieces down to fill nulls
-    for x in range(board.GRID_SIZE_X):
-        var new_col = []
-        var fall_targets = [] # Track (piece, start_pos, end_pos) for animation
-        for y in range(board.GRID_SIZE_Y-1, -1, -1):
-            if board.grid[x][y] != null:
-                new_col.append(board.grid[x][y])
-                # Track falling pieces
-                var piece = board.piece_nodes[x][y]
-                var start_pos = piece.position
-                fall_targets.append({"piece": piece, "start_pos": start_pos, "end_pos": Vector2(x, new_col.size() - 1) * board.PIECE_SIZE})
-        # Fill up with new random pieces at the top, preventing new matches
-        while new_col.size() < board.GRID_SIZE_Y:
-            var allowed = board.ALLOWED_PIECE_TYPES.duplicate()
-            var y_pos = board.GRID_SIZE_Y - 1 - new_col.size()
-            # Prevent vertical match
-            if new_col.size() >= board.MATCH_LENGTH - 1:
-                var same = true
-                for i in range(1, board.MATCH_LENGTH - 1):
-                    if new_col[new_col.size() - i] != new_col[new_col.size() - 1]:
-                        same = false
-                        break
-                if same:
-                    allowed.erase(new_col[new_col.size() - 1])
-            # Prevent horizontal match
-            if x >= board.MATCH_LENGTH - 1:
-                var same = true
-                for i in range(1, board.MATCH_LENGTH - 1):
-                    if board.grid[x - i][y_pos] != board.grid[x - 1][y_pos]:
-                        same = false
-                        break
-                if same and board.grid[x - 1][y_pos] in allowed:
-                    allowed.erase(board.grid[x - 1][y_pos])
+    # 1. Calculate all fall moves and new spawns, and update board state
+    var fall_moves = [] # Each move: {piece, from: Vector2, to: Vector2, is_new: bool}
+    var grid_x = board.GRID_SIZE_X
+    var grid_y = board.GRID_SIZE_Y
+    var piece_size = board.PIECE_SIZE
+    for x in range(grid_x):
+        var write_y = grid_y - 1
+        for read_y in range(grid_y - 1, -1, -1):
+            if board.grid[x][read_y] != null:
+                if write_y != read_y:
+                    var piece = board.piece_nodes[x][read_y]
+                    fall_moves.append({"piece": piece, "from": Vector2(x, read_y), "to": Vector2(x, write_y), "is_new": false})
+                    board.grid[x][write_y] = board.grid[x][read_y]
+                    board.piece_nodes[x][write_y] = piece
+                    board.grid[x][read_y] = null
+                    board.piece_nodes[x][read_y] = null
+                write_y -= 1
+        for y in range(write_y, -1, -1):
+            var allowed = board.ALLOWED_PIECE_TYPES
             var new_type = allowed[randi() % allowed.size()]
-            new_col.append(new_type)
-        # Write back to grid (bottom to top)
-        for y in range(board.GRID_SIZE_Y-1, -1, -1):
-            board.grid[x][y] = new_col[board.GRID_SIZE_Y-1-y]
-    # Respawn visuals
-    board.spawn_visual_pieces()
-    # Animate all falling pieces (including new spawns)
-    for x in range(board.GRID_SIZE_X):
-        for y in range(board.GRID_SIZE_Y):
-            var piece = board.piece_nodes[x][y]
-            if piece:
-                var start_pos = piece.position
-                var end_pos = Vector2(x, y) * board.PIECE_SIZE
-                piece.position = end_pos # Directly set position, no animation here
-    # Simulate fall animation delay
-    if effects_enabled and effects_state_machine:
-        await get_tree().create_timer(0.1).timeout # fallback to a short delay if needed
+            board.grid[x][y] = new_type
+            var piece_scene = board.piece_scenes.get(new_type, null)
+            if piece_scene:
+                var piece = piece_scene.instantiate()
+                var from_y = y - 1 - (grid_y - write_y)
+                var start_pos = Vector2(x, from_y) * piece_size
+                var end_pos = Vector2(x, y) * piece_size
+                piece.position = start_pos
+                board.piece_container.add_child(piece)
+                board.piece_nodes[x][y] = piece
+                fall_moves.append({"piece": piece, "from": Vector2(x, from_y), "to": Vector2(x, y), "is_new": true})
+            else:
+                board.piece_nodes[x][y] = null
+    # 2. Animate visuals (or instantly finish if effects are disabled)
+    print("[Debug] About to animate cascade visuals")
+    if effects_state_machine:
+        effects_state_machine.animate_cascade_visuals(fall_moves, board)
+    print("[Debug] Finished animating cascade visuals")
+    # 3. Print board state for debugging
+    print_board_state()
+    var matches = find_all_matches()
+    print("[Debug] Matches after cascade: ", matches)
+    if matches.size() > 0:
+        if matches == pending_matches:
+            print("[Error] Infinite match loop detected! Breaking out.")
+            await enter_state(BoardState.IDLE)
+        else:
+            pending_matches = matches
+            await enter_state(BoardState.MATCH_ANIMATE)
     else:
-        await get_tree().create_timer(1.0).timeout # fallback
+        await enter_state(BoardState.IDLE)
+
+func print_board_state():
+    print("[Debug] Board state:")
+    for y in range(board.GRID_SIZE_Y):
+        var row = []
+        for x in range(board.GRID_SIZE_X):
+            row.append(board.grid[x][y])
+        print(row)
 
 # After a move/shift, start the cascade process
 func check_for_matches():
@@ -355,4 +356,45 @@ func clear_initial_matches():
         if matches.size() == 0:
             break
         remove_matches(matches)
-        queue_cascade_with_delay() 
+        # Refill and update visuals instantly (no animation)
+        var fall_moves = []
+        var grid_x = board.GRID_SIZE_X
+        var grid_y = board.GRID_SIZE_Y
+        var piece_size = board.PIECE_SIZE
+        for x in range(grid_x):
+            var write_y = grid_y - 1
+            for read_y in range(grid_y - 1, -1, -1):
+                if board.grid[x][read_y] != null:
+                    if write_y != read_y:
+                        var piece = board.piece_nodes[x][read_y]
+                        fall_moves.append({"piece": piece, "from": Vector2(x, read_y), "to": Vector2(x, write_y), "is_new": false})
+                        board.grid[x][write_y] = board.grid[x][read_y]
+                        board.piece_nodes[x][write_y] = piece
+                        board.grid[x][read_y] = null
+                        board.piece_nodes[x][read_y] = null
+                    write_y -= 1
+            for y in range(write_y, -1, -1):
+                var allowed = board.ALLOWED_PIECE_TYPES
+                var new_type = allowed[randi() % allowed.size()]
+                board.grid[x][y] = new_type
+                var piece_scene = board.piece_scenes.get(new_type, null)
+                if piece_scene:
+                    var piece = piece_scene.instantiate()
+                    var from_y = y - 1 - (grid_y - write_y)
+                    var start_pos = Vector2(x, from_y) * piece_size
+                    var end_pos = Vector2(x, y) * piece_size
+                    piece.position = end_pos # Instantly set to final position
+                    board.piece_container.add_child(piece)
+                    board.piece_nodes[x][y] = piece
+                else:
+                    board.piece_nodes[x][y] = null
+        # Instantly update visuals
+        for move in fall_moves:
+            if move["piece"]:
+                move["piece"].position = move["to"] * board.PIECE_SIZE 
+
+func set_debug_mode(enabled: bool):
+    debug_mode = enabled
+
+func toggle_debug_mode():
+    debug_mode = !debug_mode 

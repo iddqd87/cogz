@@ -87,3 +87,4 @@ debug_quit_game={
 [rendering]
 
 textures/vram_compression/import_etc2_astc=true
+occlusion_culling/stretch/scale_mode="fractional"

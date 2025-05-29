@@ -1,6 +1,10 @@
 extends Node
 
-# TWEAK SETTINGS (Juicy Animation & Timing)
+var effects_enabled := true # Toggle to enable/disable all effects
+var debug_mode := false # Toggle debug output
+
+# TWEAK SETTINGS (Animation & Timing)
+
 # --- Raise/Pop Effect ---
 var raise_offset := -20         # How high to raise the line (pixels, optional)
 var raise_duration := 0.15      # How long the raise animation takes (seconds)
@@ -11,21 +15,10 @@ var raise_z_index := 10         # z_index when raised
 var normal_z_index := 0         # default z_index
 
 # --- Fall/Refill Effect ---
-# fall_speed_per_cell: Base seconds per cell fallen (lower = faster overall fall)
-var fall_speed_per_cell := 0.01
-# fall_exponent: Controls how much momentum longer falls have (0.5 = sqrt, 1.0 = linear, <1 = more snap)
-var fall_exponent := 0.6
-# min_fall_time: Minimum time for any fall, even for a single cell (prevents instant jumps)
-var min_fall_time := 0.005
-# fall_ease: Easing function for the fall (EXPO = fast, snappy)
-var fall_ease := Tween.TRANS_EXPO
-
-var effects_enabled := true # Toggle to enable/disable all effects
-
-# --- Signals for future use (connect in the editor or code) ---
-signal _line_raised(pieces)
-signal _line_lowered(pieces)
-signal _piece_fell(piece)
+var fall_speed_per_cell := 0.07 # Seconds per cell (lower = faster fall) Classic match-3 feel at 0.07
+var fall_exponent := 0.5 # Amount of momentum longer falls have. Classic: sqrt for momentum
+var min_fall_time := 0.04 # Minimum time for any fall, even for a single cell (prevents instant jumps) Classic: short but visible at .04
+var fall_ease := Tween.TRANS_BOUNCE # Easing function for the fall (BOUNCE = classic, playful)
 
 # State for tracking currently raised line
 var _raised_pieces := []
@@ -33,7 +26,12 @@ var _raised_positions := []
 var _raised_mode := ""
 var _raised_index := -1
 
-# Helper: Animate raising a line of pieces (row or column) with pop effect
+# --- Signals for future use (connect in the editor or code) ---
+signal _line_raised(pieces)
+signal _line_lowered(pieces)
+signal _piece_fell(piece)
+
+# Animate raising a line of pieces (row or column) with raised effect
 func raise_line(board, mode: String, index: int):
     if not effects_enabled:
         return
@@ -54,24 +52,27 @@ func raise_line(board, mode: String, index: int):
     for piece in _raised_pieces:
         var tween = piece.create_tween()
         tween.tween_property(piece, "scale", Vector2(raise_scale, raise_scale), raise_duration).set_trans(raise_ease).set_ease(raise_ease_type)
-        # Optionally: tween.tween_property(piece, "position", piece.position + Vector2(0, raise_offset), raise_duration)
         piece.z_index = raise_z_index
-    emit_signal("_line_raised", _raised_pieces)
+    if get_signal_connection_list("_line_raised").size() > 0:
+        emit_signal("_line_raised", _raised_pieces)
+    else:
+        print("[Warning] _line_raised signal emitted but no slots connected.")
 
 # Helper: Animate lowering a line of pieces back to original position and scale
 func lower_line(board, mode: String, index: int):
     if not effects_enabled:
         return
-    # Only lower if the mode and index match the currently raised line
     if _raised_mode != mode or _raised_index != index:
         return
     for i in range(_raised_pieces.size()):
         var piece = _raised_pieces[i]
         var tween = piece.create_tween()
         tween.tween_property(piece, "scale", Vector2(1, 1), raise_duration).set_trans(raise_ease).set_ease(raise_ease_type)
-        # Optionally: tween.tween_property(piece, "position", _raised_positions[i], raise_duration)
         piece.z_index = normal_z_index
-    emit_signal("_line_lowered", _raised_pieces)
+    if get_signal_connection_list("_line_lowered").size() > 0:
+        emit_signal("_line_lowered", _raised_pieces)
+    else:
+        print("[Warning] _line_lowered signal emitted but no slots connected.")
     _raised_pieces.clear()
     _raised_positions.clear()
     _raised_mode = ""
@@ -140,5 +141,50 @@ func _fall_piece(piece, start_pos, end_pos, fall_time):
         push_error("Failed to create tween for piece!")
         return
     tween.tween_property(piece, "position", end_pos, fall_time).from(start_pos).set_trans(fall_ease).set_ease(Tween.EASE_OUT)
-    emit_signal("_piece_fell", piece)
-    await tween.finished 
+    if get_signal_connection_list("_piece_fell").size() > 0:
+        emit_signal("_piece_fell", piece)
+    else:
+        print("[Warning] _piece_fell signal emitted but no slots connected.")
+    await tween.finished
+
+# Animate only the visuals for cascade/refill. Logic is handled in board_state_machine.gd.
+func animate_cascade_visuals(fall_moves, board):
+    if debug_mode:
+        print("[Effects] Animating cascade: ", fall_moves.size(), " moves, effects_enabled=", effects_enabled)
+    if not effects_enabled:
+        # Instantly set all piece positions to their final spot
+        for move in fall_moves:
+            if move["piece"]:
+                move["piece"].position = move["to"] * board.PIECE_SIZE
+        print("[Effects] Cascade visuals skipped (effects disabled)")
+        return
+    var tweens = []
+    for move in fall_moves:
+        var piece = move["piece"]
+        if piece:
+            if not piece.is_inside_tree():
+                print("[Error] Piece not in scene tree: ", piece, " move=", move)
+            var start_pos = move["from"] * board.PIECE_SIZE
+            var end_pos = move["to"] * board.PIECE_SIZE
+            var fall_distance = abs(move["to"].y - move["from"].y)
+            var fall_time = min_fall_time + fall_speed_per_cell * pow(fall_distance, fall_exponent)
+            piece.position = start_pos
+            print("[Tween] Piece ", piece, " from ", start_pos, " to ", end_pos, " time=", fall_time)
+            var tween = piece.create_tween()
+            tween.tween_property(piece, "position", end_pos, fall_time).from(start_pos).set_trans(fall_ease).set_ease(Tween.EASE_OUT)
+            tween.connect("finished", func(): print("[Tween] Finished for piece: ", piece))
+            tweens.append(tween)
+        else:
+            print("[Error] Null piece in fall_moves: ", move)
+    print("[Effects] Starting tweens: ", tweens.size())
+    for tween in tweens:
+        await tween.finished
+    print("[Effects] All tweens finished")
+    print("[Effects] Cascade visuals finished.")
+    print("[Effects] REALLY returning from animate_cascade_visuals")
+
+func set_debug_mode(enabled: bool):
+    debug_mode = enabled
+
+func toggle_debug_mode():
+    debug_mode = !debug_mode 
