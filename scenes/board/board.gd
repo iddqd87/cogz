@@ -4,6 +4,7 @@ const GRID_SIZE_X = 8
 const GRID_SIZE_Y = 8
 const PIECE_SIZE = 16
 const PIECE_TYPES = 6
+const PieceTypes = preload("res://scenes/board/piece_types.gd")
 
 var grid := []
 var piece_nodes := []
@@ -11,16 +12,10 @@ var piece_scenes := {}
 var state_machine: Node
 var operations: Node
 
-const PieceTypes = preload("res://scenes/board/piece_types.gd")
-
-# Use all types except 'debug' by default
-var ALLOWED_PIECE_TYPES = []
-
-# Toggle to include or exclude debug pieces
+#tweak settings
 var INCLUDE_DEBUG_PIECE := false  # Set to true to include debug pieces
-
-# Set the required number of connecting colors for a match
-var MATCH_LENGTH := 4  # Change this to set how many connecting colors are required
+var MATCH_LENGTH := 3  # Set how many connections are required
+var ALLOWED_PIECE_TYPES = [] # Edit in piece_types.gd
 
 @onready var piece_container = $PieceContainer
 
@@ -38,14 +33,21 @@ func _ready():
     
     # Initialize state machine
     var state_machine_script = load("res://scenes/board/board_state_machine.gd")
-    state_machine = state_machine_script.new(self)
-    state_machine.set_match_length(MATCH_LENGTH) # Set match length on state machine
+    state_machine = state_machine_script.new()
+    state_machine.set_board(self)
     add_child(state_machine)
     
     # Initialize operations
     var operations_script = load("res://scenes/board/board_operations.gd")
     operations = operations_script.new(self)
     add_child(operations)
+    
+    # Ensure effects_state_machine node exists
+    if not has_node("effects_state_machine"):
+        var effects_script = load("res://scenes/board/effects_state_machine.gd")
+        var effects_node = effects_script.new()
+        effects_node.name = "effects_state_machine"
+        add_child(effects_node)
     
     preload_piece_scenes()
     initialize_grid()
