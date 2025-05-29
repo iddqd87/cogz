@@ -12,7 +12,6 @@ enum BoardState {
 
 # TWEAK SETTINGS
 var match_delay := 0.05 # seconds (simulate match disappear animation)
-var cascade_delay := 0.05 # seconds (simulate fall animation, legacy)
 # Add more tweakable settings here as needed
 
 # --- Signals for future use (connect in the editor or code) ---
@@ -257,14 +256,10 @@ func queue_cascade_with_delay():
             if piece:
                 var start_pos = piece.position
                 var end_pos = Vector2(x, y) * board.PIECE_SIZE
-                if effects_enabled:
-                    if effects_state_machine:
-                        effects_state_machine.animate_piece_fall(piece, start_pos, end_pos)
-                    else:
-                        push_error("effects_state_machine is null in animate_piece_fall!")
+                piece.position = end_pos # Directly set position, no animation here
     # Simulate fall animation delay
     if effects_enabled and effects_state_machine:
-        await get_tree().create_timer(effects_state_machine.fall_duration + effects_state_machine.squash_duration + effects_state_machine.stretch_duration).timeout
+        await get_tree().create_timer(0.1).timeout # fallback to a short delay if needed
     else:
         await get_tree().create_timer(1.0).timeout # fallback
 

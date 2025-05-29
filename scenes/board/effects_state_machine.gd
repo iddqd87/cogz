@@ -19,7 +19,6 @@ var fall_exponent := 0.6
 var min_fall_time := 0.005
 # fall_ease: Easing function for the fall (EXPO = fast, snappy)
 var fall_ease := Tween.TRANS_EXPO
-var fall_duration := 0.02        # legacy, used for animate_piece_fall only
 
 var effects_enabled := true # Toggle to enable/disable all effects
 
@@ -77,15 +76,6 @@ func lower_line(board, mode: String, index: int):
     _raised_positions.clear()
     _raised_mode = ""
     _raised_index = -1
-
-# Helper: Animate a piece falling
-func animate_piece_fall(piece, start_pos, end_pos):
-    if not effects_enabled:
-        return
-    var tween = piece.create_tween()
-    # Fall
-    tween.tween_property(piece, "position", end_pos, fall_duration).from(start_pos).set_trans(fall_ease).set_ease(Tween.EASE_OUT)
-    emit_signal("_piece_fell", piece)
 
 # Helper: Animate match removal (with delay, can be expanded for effects)
 func animate_match_removal(matches: Array, match_delay: float) -> void:

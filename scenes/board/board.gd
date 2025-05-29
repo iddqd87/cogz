@@ -42,10 +42,14 @@ func _ready():
     operations = operations_script.new(self)
     add_child(operations)
     
-    # Ensure effects_state_machine node exists
-    if not has_node("effects_state_machine"):
-        var effects_script = load("res://scenes/board/effects_state_machine.gd")
-        var effects_node = effects_script.new()
+    # Ensure effects_state_machine node exists and has correct script
+    var effects_script = load("res://scenes/board/effects_state_machine.gd")
+    var effects_node = get_node_or_null("effects_state_machine")
+    if effects_node:
+        if not effects_node.has_method("raise_line"):
+            effects_node.set_script(effects_script)
+    else:
+        effects_node = effects_script.new()
         effects_node.name = "effects_state_machine"
         add_child(effects_node)
     
